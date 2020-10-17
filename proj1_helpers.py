@@ -10,7 +10,8 @@ def load_csv_data(data_path, sub_sample=False):
     x = np.genfromtxt(data_path, delimiter=",", skip_header=1)
     ids = x[:, 0].astype(np.int)
     input_data = x[:, 2:]
-
+    headers =  np.genfromtxt(data_path, delimiter=",",dtype=str, max_rows = 1)
+    headers = headers[2:]
     # convert class labels from strings to binary (-1,1)
     yb = np.ones(len(y))
     yb[np.where(y=='b')] = -1
@@ -21,7 +22,7 @@ def load_csv_data(data_path, sub_sample=False):
         input_data = input_data[::50]
         ids = ids[::50]
 
-    return yb, input_data, ids
+    return yb, input_data, ids, headers
 
 
 def predict_labels(weights, data):
