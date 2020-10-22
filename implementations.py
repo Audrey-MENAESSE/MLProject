@@ -122,7 +122,7 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     """Regularized Logistic Regression with SGD."""
     w = initial_w
     # start the logistic regression
-    for iter in range(max_iter):
+    for iter in range(max_iters):
         
         for minibatch_y, minibatch_tx in batch_iter(y, tx, batch_size=1, num_batches=1):
             minibatch_y = minibatch_y[:, np.newaxis]
@@ -130,7 +130,7 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
             w = w - gamma*grad   
         
         # log info only at certain steps
-        if iter % 100 == 0 or iter == max_iter-1:
+        if iter % 100 == 0 or iter == max_iters-1:
             loss = calculate_loss_lr_reg(y, tx, lambda_, w)
             print("Current iteration={i}, training loss={l}".format(i=iter, l=loss))
     
