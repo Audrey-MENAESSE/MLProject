@@ -93,3 +93,36 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
             print("Current iteration={i}, training loss={l}".format(i=iter, l=loss))
     
     return w, loss
+
+
+###### Regularized Logistic Regression ########
+
+def calculate_loss_lr_reg(y, tx, lambda_, w):
+    """compute the regularized loss: negative log likelihood. With for loop because of memory error"""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
+    return loss
+
+
+def calculate_gradient_lr_reg(y, tx, lambda_, w):
+    """compute the gradient of loss for Logistic Regression."""
+    return tx.T.dot(sigmoid(tx.dot(w))-y) + lambda_*w
+
+def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
+    """Regularized Logistic Regression with SGD."""
+    w = initial_w
+    # start the logistic regression
+    for iter in range(max_iter):
+        
+        for minibatch_y, minibatch_tx in batch_iter(y, tx, batch_size=1, num_batches=1):
+            minibatch_y = minibatch_y[:, np.newaxis]
+            grad = calculate_gradient_lr_reg(minibatch_y, minibatch_tx, lambda_, w)
+            w = w - gamma*grad   
+        
+        # log info only at certain steps
+        if iter % 100 == 0 or iter == max_iter-1:
+            loss = calculate_loss_lr_reg(y, tx, lambda_, w)
+            print("Current iteration={i}, training loss={l}".format(i=iter, l=loss))
+    
+    return w, loss
