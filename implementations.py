@@ -1,6 +1,9 @@
 import numpy as np
 
-#### Useful functions #####
+    # ***************************************************
+    #  Useful Functions
+    # ***************************************************
+
 
 def split_data(x, y, ratio, seed=1):
     """
@@ -57,8 +60,11 @@ def standardize(x):
     return x
 
 
-#### Logistic Regression Functions ####
+    # ***************************************************
+    #  Logistic Regression Functions
+    # ***************************************************
 
+    
 def sigmoid(t):
     """apply the sigmoid function on t."""
     return np.exp(t) / (1 + np.exp(t))
@@ -95,7 +101,10 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
     return w, loss
 
 
-###### Regularized Logistic Regression ########
+    # ***************************************************
+    #  Regularized Logistic Regression Functions
+    # ***************************************************
+    
 
 def calculate_loss_lr_reg(y, tx, lambda_, w):
     """compute the regularized loss: negative log likelihood. With for loop because of memory error"""
