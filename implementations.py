@@ -52,8 +52,7 @@ def batch_iter(y, tx, batch_size, num_batches=1, shuffle=True):
             
 
 def standardize(x):
-    ''' fill your code in here...
-    '''
+    ''' Standardize each column of the input. '''
     x = (x-np.mean(x, axis=0))/np.std(x, axis=0)
     return x
 
@@ -64,13 +63,33 @@ def sigmoid(t):
     """apply the sigmoid function on t."""
     return np.exp(t) / (1 + np.exp(t))
 
-def calculate_loss(y, tx, w):
-    """compute the loss: negative log likelihood. With for loop because of memory error"""
+
+def calculate_loss_lr(y, tx, w):
+    """compute the loss: negative log likelihood. With for loop to avoid memory error of Matrix Ops."""
     loss = 0
     for i in range(y.shape[0]):
-        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - np.multiply(y[i], tx[i].dot(w))
+        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
     return loss
 
-def calculate_gradient(y, tx, w):
-    """compute the gradient of loss."""
+
+def calculate_gradient_lr(y, tx, w):
+    """compute the gradient of loss for Logistic Regression."""
     return tx.T.dot(sigmoid(tx.dot(w))-y)
+
+
+def logistic_regression(y, tx, initial_w, max_iters, gamma):
+    w = initial_w
+    
+    for iter in range(max_iters):
+        
+        for minibatch_y, minibatch_tx in batch_iter(y, tx, batch_size=1, num_batches=1):
+            minibatch_y = minibatch_y[:, np.newaxis]
+            grad = calculate_gradient_lr(minibatch_y, minibatch_tx, w)
+            w = w - gamma*grad   
+        
+        # log info only at certain steps and at the last step.
+        if iter % 100 == 0 or iter == max_iters-1:
+            loss = calculate_loss_lr(y, tx, w)
+            print("Current iteration={i}, training loss={l}".format(i=iter, l=loss))
+    
+    return w, loss
