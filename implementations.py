@@ -1,8 +1,102 @@
 import numpy as np
 
-    # ***************************************************
-    #  Useful Functions
-    # ***************************************************
+#*******************************************************
+#                   BASIC functions
+#*******************************************************
+
+
+def least_squares_GD(y, tx, initial_w, max_iters, gamma):
+    """Gradient descent algorithm."""
+    # Define parameters to store w and loss
+    w = initial_w
+    
+    for n_iter in range(max_iters):
+        grad = compute_gradient_ls(y, tx, w)
+        w = w - gamma*grad
+        
+        if n_iter % 100 == 0 or n_iter == max_iters-1:
+            loss = compute_loss_mse2(y, tx, w)
+            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+
+    return loss, w
+
+
+def least_squares_SGD(y, tx, initial_w, max_iters, gamma):
+    """Stochastic gradient descent algorithm."""
+    w = initial_w
+    for n_iter in range(max_iters):
+        (y, tx) = np.random.choice(np.arange(len(y)))
+        # loss is the MSE
+        grad = compute_gradient_ls(y, tx, w)
+        w = w - gamma*grad
+        
+        if n_iter % 100 == 0 or n_iter == max_iters-1:
+            loss = compute_loss_mse(y, tx, w)
+            print("Gradient Descent({bi}/{ti}): loss={l}".format(bi=n_iter, ti=max_iters - 1, l=loss))
+        
+    return loss, w
+
+
+def least_squares(y, tx):
+    """calculate the least squares solution."""
+    a = tx.T.dot(tx)
+    b = tx.T.dot(y)
+    w = np.linalg.solve(a, b)
+    loss = compute_loss_mse(y, tx, w)
+    return w, loss
+
+
+def ridge_regression(y, tx, lambda_):
+    """implement ridge regression."""
+    l1 = 2*len(tx)*lambda_
+    xx = tx.T.dot(tx)
+    a = (xx+ l1*np.eye(len(xx)))
+    b = tx.T.dot(y)
+    w = np.linalg.solve(a,b)
+    return w
+
+
+def logistic_regression(y, tx, initial_w, max_iters, gamma):
+    """compute the gradient of loss for Logistic Regression. Hard coded mini-batch size of 1."""
+    w = initial_w
+    
+    # start the logistic regression
+    for n_iter in range(max_iters):
+        
+        i = np.random.choice(np.arange(len(y)))
+        
+        grad = calculate_gradient_lr(y[i:i+1], tx[i:i+1], w)
+        w = w - gamma*grad   
+        
+        # log info only at certain steps and at the last step.
+        if n_iter % 1000 == 0 or n_iter == max_iters-1:
+            loss = calculate_loss_lr(y, tx, w)
+            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+    
+    return w, loss
+
+
+def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
+    """Regularized Logistic Regression with SGD."""
+    w = initial_w
+    # start the logistic regression
+    for n_iter in range(max_iters):
+        
+        i = np.random.permutation(np.arange(0, tx.shape[0]))[0]
+        grad = calculate_gradient_lr_reg(y[i:i+1], tx[i:i+1], lambda_, w)
+        w = w - gamma*grad   
+        
+        # log info only at certain steps
+        if n_iter % 1000 == 0 or n_iter == max_iters-1:
+            loss = calculate_loss_lr_reg(y, tx, lambda_, w)
+            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+    
+    return w, loss
+
+    
+# ***************************************************
+#  Useful Functions
+# ***************************************************
 """ Feature Processing functions """
 # Replacing the missing values by the average 
 def replace_missing (tX):
@@ -172,31 +266,6 @@ def compute_gradient_ls(y, tx, w):
     
     return grad
 
-def least_squares_GD(y, tx, initial_w, max_iters, gamma):
-    """Gradient descent algorithm."""
-    # Define parameters to store w and loss
-    w = initial_w
-    
-    for n_iter in range(max_iters):
-        grad = compute_gradient_ls(y, tx, w)
-        w = w - gamma*grad
-        
-        if n_iter % 100 == 0 or n_iter == max_iters-1:
-            loss = compute_loss_mse2(y, tx, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
-
-    return loss, w
-
-    # ***************************************************
-    #  Least squares with Stochastic Gradient Descent
-    # ***************************************************
-    
-    
-    
-    # ***************************************************
-    #  Least squares with normal equations
-    # ***************************************************
-    
 
 def compute_loss_mse(y, tx, w):
     """Calculate the mse loss."""
@@ -210,13 +279,7 @@ def compute_loss_mse_loop(y, tx, w):
     return 0.5*loss/y.shape[0]
 
 
-def least_squares(y, tx):
-    """calculate the least squares solution."""
-    a = tx.T.dot(tx)
-    b = tx.T.dot(y)
-    w = np.linalg.solve(a, b)
-    loss = compute_loss_mse(y, tx, w)
-    return w, loss
+
 
 def calculate_loss_mse2(y, tx, w):
     """compute mse loss: for loop because of memory error"""
@@ -249,23 +312,6 @@ def calculate_gradient_lr(y, tx, w):
     return tx.T.dot(sigmoid(tx.dot(w))-y)
 
 
-def logistic_regression(y, tx, initial_w, max_iters, gamma):
-    """compute the gradient of loss for Logistic Regression. Hard coded mini-batch size of 1."""
-    w = initial_w
-    
-    # start the logistic regression
-    for n_iter in range(max_iters):
-        
-        i = np.random.permutation(np.arange(0, tx.shape[0]))[0]
-        grad = calculate_gradient_lr(y[i:i+1], tx[i:i+1], w)
-        w = w - gamma*grad   
-        
-        # log info only at certain steps and at the last step.
-        if n_iter % 1000 == 0 or n_iter == max_iters-1:
-            loss = calculate_loss_lr(y, tx, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
-    
-    return w, loss
 
 
     # ***************************************************
@@ -285,34 +331,10 @@ def calculate_gradient_lr_reg(y, tx, lambda_, w):
     """compute the gradient of loss for Logistic Regression."""
     return tx.T.dot(sigmoid(tx.dot(w))-y) + lambda_*w
 
-def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
-    """Regularized Logistic Regression with SGD."""
-    w = initial_w
-    # start the logistic regression
-    for n_iter in range(max_iters):
-        
-        i = np.random.permutation(np.arange(0, tx.shape[0]))[0]
-        grad = calculate_gradient_lr_reg(y[i:i+1], tx[i:i+1], lambda_, w)
-        w = w - gamma*grad   
-        
-        # log info only at certain steps
-        if n_iter % 1000 == 0 or n_iter == max_iters-1:
-            loss = calculate_loss_lr_reg(y, tx, lambda_, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
-    
-    return w, loss
+
 
 def calculate_accuracy (y_test, x_test, coeffs) :
     y_pred = x_test.dot(coeffs)
     acc = np.sum(y_pred==y_test)/len(y_test)
     print("There are {acc} % of correct predictions".format(
               acc = accuracy))
-    
-def ridge_regression(y, tx, lambda_):
-    """implement ridge regression."""
-    l1 = 2*len(tx)*lambda_
-    xx = tx.T.dot(tx)
-    a = (xx+ l1*np.eye(len(xx)))
-    b = tx.T.dot(y)
-    ws = np.linalg.solve(a,b)
-    return ws
