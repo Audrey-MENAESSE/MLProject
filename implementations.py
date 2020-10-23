@@ -71,7 +71,7 @@ def PCA_bias (tX) :
     
     return (data_ones)
 
-def build_poly (tX, degree):
+def build_poly2 (tX, degree):
     N= len(tX[0])
     new_tX = np.ones(tX.shape[0])
     for i in range(N):
@@ -82,6 +82,15 @@ def build_poly (tX, degree):
         new_tX = np.column_stack((new_tX, ft))
     new_tX = np.delete(new_tX, 0, axis=1)
     return new_tX
+
+def build_poly(x, degree):
+    # This seems simpler
+    x_poly = np.ones(len(x))[:,None]
+    for i in range(degree):
+        pol = x**(i+1)
+        x_poly = np.concatenate((x_poly, pol), axis=1)
+    return x_poly
+
 
 def arrange_data (tX, headers, degree):
     data = replace_missing (tX)
@@ -295,15 +304,15 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
 
 def calculate_accuracy (y_test, x_test, coeffs) :
     y_pred = x_test.dot(coeffs)
-    N = len (y_test)
-    T = 0
-    F = 0
-    for i in range (N) :
-        if y_test[i]*y_pred[i]>0:
-            T+=1
-        else : 
-            F+=1
-    accuracy = 100*T/N
+    acc = np.sum(y_pred==y_test)/len(y_test)
     print("There are {acc} % of correct predictions".format(
               acc = accuracy))
     
+def ridge_regression(y, tx, lambda_):
+    """implement ridge regression."""
+    l1 = 2*len(tx)*lambda_
+    xx = tx.T.dot(tx)
+    a = (xx+ l1*np.eye(len(xx)))
+    b = tx.T.dot(y)
+    ws = np.linalg.solve(a,b)
+    return ws
