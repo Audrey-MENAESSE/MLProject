@@ -438,10 +438,12 @@ def process_features_train(tx, headers, y, deg):
     tx_1 = tx_1[inds1, :]
     inds23 = np.append(inds2, inds3)
     tx_2 = tx_2[inds23, :]
-
+    
+    y0 = y.copy()
     y1 = y.copy()
     y23 = y.copy()
 
+    y0 = y0[inds0]
     y1 = y1[inds1]
     y23 = y23[inds23] 
     
@@ -462,21 +464,22 @@ def process_features_train(tx, headers, y, deg):
     tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
     
     # create subsets of tx_0 to predict with base model
+    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
     tx_01 = tx_0[inds1]
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
     tx_023 = np.concatenate((tx_02, tx_03), axis=0)
-    tx_0 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    
     
     data = []
     data.append(tx_0)
+    data.append(tx_00)
     data.append(tx_1)
     data.append(tx_01)
     data.append(tx_2)
     data.append(tx_023)
     
     # create ids
-    col_cat = np.where(headers=='PRI_jet_num')[0]
     ids0 = ids_[inds0]
     ids1 = ids_[inds1]
     ids2 = ids_[inds2]
@@ -484,22 +487,26 @@ def process_features_train(tx, headers, y, deg):
     ids23 = np.append(ids2, ids3)
     
     ids = []
-    ids.append(ids0)
-    ids.append(ids1)
+    ids.append(inds0)
+    ids.append(inds1)
     ids.append(ids23)
     
     # Create target y values
-    y01 = y.copy()
-    y01[ y01 < 0] = 0
+    y01 = y
+    y01[y01 < 0] = 0
+    
+    y001 = y0 
+    y001[y001 < 0] = 0
+    
+    y101 = y1 
+    y101[y101 < 0] = 0
 
-    y101 = y1.copy() 
-    y101[ y101 < 0] = 0
-
-    y201 = y23.copy() 
-    y201[ y201 < 0] = 0
+    y201 = y23
+    y201[y201 < 0] = 0
     
     targets = []
     targets.append(y01)
+    targets.append(y001)
     targets.append(y101)
     targets.append(y201)
     
@@ -602,10 +609,11 @@ def process_features_test(tx, headers, ids, deg):
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
     tx_023 = np.concatenate((tx_02, tx_03), axis=0)
-    tx_0 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
     
     data = []
     data.append(tx_0)
+    data.append(tx_00)
     data.append(tx_1)
     data.append(tx_01)
     data.append(tx_2)
@@ -625,26 +633,27 @@ def create_predictions(weights, data, ids):
     weights2 = weights[2]
 
     tx_0 = data[0]
-    tx_1 = data[1]
-    tx_01 = data[2]
-    tx_2 = data[3]
-    tx_02 = data[4]
+    tx_00 = data[1]
+    tx_1 = data[2]
+    tx_01 = data[3]
+    tx_2 = data[4]
+    tx_02 = data[5]
     
     ids0 = ids[0]
     ids1 = ids[1]
     ids23 = ids[2]
 
     # predict labels for jet=0
-    y_pred0 = predict_labels01(weights0, tx_0)
-    y_pred0[y_pred0 == 0] = -1
+    y_pred0 = predict_labels01(weights0, tx_00)
+    y_pred0[y_pred0 < 0.6] = -1
 
     # predictions for jet=1
     y_pred1 = predict_labels01_comb(weights1, tx_1, weights0, tx_01)
-    y_pred1[y_pred1 == 0] = -1
+    y_pred1[y_pred1 < 0.6] = -1
 
     # predictions for jet=23
     y_pred2 = predict_labels01_comb(weights2, tx_2, weights0, tx_02)
-    y_pred2[y_pred2 == 0] = -1
+    y_pred2[y_pred2 < 0.6] = -1
     
     y_pred = np.vstack((y_pred0, y_pred1, y_pred2))
 
@@ -659,6 +668,8 @@ def create_predictions(weights, data, ids):
     y_pred_order = y_pred_ids[y_pred_ids[:,0].argsort()]
 
     # remove ids column now that order is restored
+    print(y_pred_order[:10])
+    
     y_pred_final = y_pred_order[:,1]
     y_pred_final = y_pred_final[:, np.newaxis]
     
