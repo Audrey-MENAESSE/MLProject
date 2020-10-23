@@ -346,7 +346,7 @@ def calculate_accuracy (y_test, x_test, coeffs) :
     
 
 def remove_useless_cols(tx, headers):
-    '''Removes features that were considered to not have info from EDA.'''
+    """Remove features deemed to have no useful information."""
     cols_remove = []
     cols_remove.append(np.where(headers == "PRI_jet_leading_phi")[0])
     cols_remove.append(np.where(headers == "PRI_jet_subleading_phi")[0])
@@ -358,12 +358,27 @@ def remove_useless_cols(tx, headers):
     head_ = np.delete(headers, cols_remove) 
     
     return tx_, head_
+
+def replace_999_mean(tx, col):
+    """Replace -999 values with column mean."""
+    inds_missing = np.where(tx[:,col] == -999) 
+    inds_good = np.delete(np.arange(tx.shape[0]), inds_missing)
+    mean_ = np.mean(tx[inds_good, col])  # caluclate the mean using only non-missing values
+    tx[inds_missing, col] = mean_        # replace all missing values with the mean
+    
+    return tx
     
     
-def process_features_train(tX, headers, y, deg):
+def process_features_train(tx, headers, y, deg):
+    
+    # category column
+    col_cat = np.where(headers=='PRI_jet_num')[0]
+    
+    # create ids to keep track of order
+    ids_ = np.arange(tx.shape[0])
     
     # remove features deemed useless from EDA
-    tx_, head_ = remove_useless_cols(tX, headers)
+    tx_, head_ = remove_useless_cols(tx, headers)
     
     # replace missing values in first feature with mean
     tx_ = replace_999_mean(tx_, 0)
@@ -446,6 +461,13 @@ def process_features_train(tX, headers, y, deg):
     tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
     tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
     
+    # create subsets of tx_0 to predict with base model
+    tx_01 = tx_0[inds1]
+    tx_02 = tx_0[inds2]
+    tx_03 = tx_0[inds3]
+    tx_023 = np.concatenate((tx_02, tx_03), axis=0)
+    tx_0 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    
     data = []
     data.append(tx_0)
     data.append(tx_1)
@@ -455,10 +477,10 @@ def process_features_train(tX, headers, y, deg):
     
     # create ids
     col_cat = np.where(headers=='PRI_jet_num')[0]
-    ids0 = ids_test[inds0]
-    ids1 = ids_test[inds1]
-    ids2 = ids_test[inds2]
-    ids3 = ids_test[inds3]
+    ids0 = ids_[inds0]
+    ids1 = ids_[inds1]
+    ids2 = ids_[inds2]
+    ids3 = ids_[inds3]
     ids23 = np.append(ids2, ids3)
     
     ids = []
@@ -484,10 +506,13 @@ def process_features_train(tX, headers, y, deg):
     return  data, targets, ids
 
 
-def process_features_test(tX, headers, ids, deg):
+def process_features_test(tx, headers, ids, deg):
+    
+    # category column
+    col_cat = np.where(headers=='PRI_jet_num')[0]
     
     # remove features deemed useless from EDA
-    tx_, head_ = remove_useless_cols(tX, headers)
+    tx_, head_ = remove_useless_cols(tx, headers)
     
     # replace missing values in first feature with mean
     tx_ = replace_999_mean(tx_, 0)
@@ -566,10 +591,10 @@ def process_features_test(tX, headers, ids, deg):
     
     # separate ids to restore order after separately predicting 
     col_cat = np.where(headers=='PRI_jet_num')[0]
-    ids0 = ids_test[inds0]
-    ids1 = ids_test[inds1]
-    ids2 = ids_test[inds2]
-    ids3 = ids_test[inds3]
+    ids0 = ids[inds0]
+    ids1 = ids[inds1]
+    ids2 = ids[inds2]
+    ids3 = ids[inds3]
     ids23 = np.append(ids2, ids3)
     
     # create subsets of tx_0 to predict with base model
@@ -577,7 +602,7 @@ def process_features_test(tX, headers, ids, deg):
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
     tx_023 = np.concatenate((tx_02, tx_03), axis=0)
-    tx_0 = tx_0[np.squeeze(tX_test[:,col_cat] == 0)]
+    tx_0 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
     
     data = []
     data.append(tx_0)
@@ -618,7 +643,7 @@ def create_predictions(weights, data, ids):
     y_pred1[y_pred1 == 0] = -1
 
     # predictions for jet=23
-    y_pred2 = predict_labels01_comb(weights2, tx_2, weights0, tx_023)
+    y_pred2 = predict_labels01_comb(weights2, tx_2, weights0, tx_02)
     y_pred2[y_pred2 == 0] = -1
     
     y_pred = np.vstack((y_pred0, y_pred1, y_pred2))
@@ -638,3 +663,21 @@ def create_predictions(weights, data, ids):
     y_pred_final = y_pred_final[:, np.newaxis]
     
     return y_pred_final
+
+def predict_labels01_comb(weights1, data1, weights2, data2):
+    """Generates class predictions given weights, and a test data matrix"""
+    y_pred1 = np.dot(data1, weights1)
+    y_pred2 = np.dot(data2, weights2)
+    y_pred = 0.6*y_pred1 + 0.4*y_pred2
+    y_pred[np.where(y_pred <= 0.5)] = 0
+    y_pred[np.where(y_pred > 0.5)] = 1
+    
+    return y_pred
+
+def predict_labels01(weights, data):
+    """Generates class predictions given weights, and a test data matrix"""
+    y_pred = np.dot(data, weights)
+    y_pred[np.where(y_pred <= 0.5)] = 0
+    y_pred[np.where(y_pred > 0.5)] = 1
+    
+    return y_pred
