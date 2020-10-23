@@ -338,3 +338,357 @@ def calculate_accuracy (y_test, x_test, coeffs) :
     acc = np.sum(y_pred==y_test)/len(y_test)
     print("There are {acc} % of correct predictions".format(
               acc = accuracy))
+
+    
+    # ***************************************************
+    #  MEGA MODEL
+    # ***************************************************
+    
+
+def remove_useless_cols(tx, headers):
+    """Remove features deemed to have no useful information."""
+    cols_remove = []
+    cols_remove.append(np.where(headers == "PRI_jet_leading_phi")[0])
+    cols_remove.append(np.where(headers == "PRI_jet_subleading_phi")[0])
+    cols_remove.append(np.where(headers == "PRI_tau_phi")[0])
+    cols_remove.append(np.where(headers == "PRI_met_phi")[0])
+    cols_remove.append(np.where(headers == "PRI_lep_phi")[0])
+
+    tx_ = np.delete(tx, cols_remove, axis = 1)
+    head_ = np.delete(headers, cols_remove) 
+    
+    return tx_, head_
+
+def replace_999_mean(tx, col):
+    """Replace -999 values with column mean."""
+    inds_missing = np.where(tx[:,col] == -999) 
+    inds_good = np.delete(np.arange(tx.shape[0]), inds_missing)
+    mean_ = np.mean(tx[inds_good, col])  # caluclate the mean using only non-missing values
+    tx[inds_missing, col] = mean_        # replace all missing values with the mean
+    
+    return tx
+    
+    
+def process_features_train(tx, headers, y, deg):
+    
+    # category column
+    col_cat = np.where(headers=='PRI_jet_num')[0]
+    
+    # create ids to keep track of order
+    ids_ = np.arange(tx.shape[0])
+    
+    # remove features deemed useless from EDA
+    tx_, head_ = remove_useless_cols(tx, headers)
+    
+    # replace missing values in first feature with mean
+    tx_ = replace_999_mean(tx_, 0)
+    
+    # first determine the categorical columns
+    col = np.where(head_=='PRI_jet_num')[0]
+    inds0 = np.where(tx_[:, col] == 0)[0]
+    inds1 = np.where(tx_[:, col] == 1)[0]
+    inds2 = np.where(tx_[:, col] == 2)[0]
+    inds3 = np.where(tx_[:, col] == 3)[0]
+
+    # remove jet_num column
+    tx_ = np.delete(tx_, col, axis=1)
+    head_ = np.delete(head_, col)
+
+    # initialize new columns as zeros
+    pri_jet0 = np.zeros(tx_.shape[0])
+    pri_jet1 = np.zeros(tx_.shape[0])
+    pri_jet2 = np.zeros(tx_.shape[0])
+    pri_jet3 = np.zeros(tx_.shape[0])
+
+    # set ones to appropriate columns
+    pri_jet0[inds0] = 1
+    pri_jet1[inds1] = 1
+    pri_jet2[inds2] = 1
+    pri_jet3[inds3] = 1
+    
+    # create separate datasets
+    tx_0 = tx_.copy()
+
+    # Features to remove for reduced tx_ 
+    cols_remove0 = []
+    cols_remove0.append(np.where(head_ == "DER_deltaeta_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_mass_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_prodeta_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_lep_eta_centrality")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_subleading_pt")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_subleading_eta")[0][0])
+
+    # cols to add for tx_1
+    cols_add1 = []
+    cols_add1.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
+    cols_add1.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
+
+    # remove features from all 
+    tx_0 = np.delete(tx_0, cols_remove0, axis=1)
+    tx_1 = tx_0.copy()
+    tx_2 = tx_0.copy()
+
+    # add back features to end of tx_0 to create tx_1 and tx_2
+    tx_1 = np.column_stack((tx_1, tx_[:, cols_add1]))
+    tx_2 = np.column_stack((tx_0, tx_[:, cols_remove0]))
+
+    # filter tx_1 and tx_2 to keep only relevant jet#s
+    tx_1 = tx_1[inds1, :]
+    inds23 = np.append(inds2, inds3)
+    tx_2 = tx_2[inds23, :]
+    
+    y0 = y.copy()
+    y1 = y.copy()
+    y23 = y.copy()
+
+    y0 = y0[inds0]
+    y1 = y1[inds1]
+    y23 = y23[inds23] 
+    
+    tx_0 = build_poly(tx_0, deg)
+    tx_1 = build_poly(tx_1, deg)
+    tx_2 = build_poly(tx_2, deg)
+
+    tx_0 = standardize(tx_0)
+    tx_1 = standardize(tx_1)
+    tx_2 = standardize(tx_2)
+
+    tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
+    tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
+    tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
+
+    # only add catergorical value when more than 1 jet# included
+    tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
+    tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
+    
+    # create subsets of tx_0 to predict with base model
+    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    tx_01 = tx_0[inds1]
+    tx_02 = tx_0[inds2]
+    tx_03 = tx_0[inds3]
+    tx_023 = np.concatenate((tx_02, tx_03), axis=0)
+    
+    
+    data = []
+    data.append(tx_0)
+    data.append(tx_00)
+    data.append(tx_1)
+    data.append(tx_01)
+    data.append(tx_2)
+    data.append(tx_023)
+    
+    # create ids
+    ids0 = ids_[inds0]
+    ids1 = ids_[inds1]
+    ids2 = ids_[inds2]
+    ids3 = ids_[inds3]
+    ids23 = np.append(ids2, ids3)
+    
+    ids = []
+    ids.append(inds0)
+    ids.append(inds1)
+    ids.append(ids23)
+    
+    # Create target y values
+    y01 = y
+    y01[y01 < 0] = 0
+    
+    y001 = y0 
+    y001[y001 < 0] = 0
+    
+    y101 = y1 
+    y101[y101 < 0] = 0
+
+    y201 = y23
+    y201[y201 < 0] = 0
+    
+    targets = []
+    targets.append(y01)
+    targets.append(y001)
+    targets.append(y101)
+    targets.append(y201)
+    
+    return  data, targets, ids
+
+
+def process_features_test(tx, headers, ids, deg):
+    
+    # category column
+    col_cat = np.where(headers=='PRI_jet_num')[0]
+    
+    # remove features deemed useless from EDA
+    tx_, head_ = remove_useless_cols(tx, headers)
+    
+    # replace missing values in first feature with mean
+    tx_ = replace_999_mean(tx_, 0)
+    
+    # first determine the categorical columns
+    col = np.where(head_=='PRI_jet_num')[0]
+    inds0 = np.where(tx_[:, col] == 0)[0]
+    inds1 = np.where(tx_[:, col] == 1)[0]
+    inds2 = np.where(tx_[:, col] == 2)[0]
+    inds3 = np.where(tx_[:, col] == 3)[0]
+
+    # remove jet_num column
+    tx_ = np.delete(tx_, col, axis=1)
+    head_ = np.delete(head_, col)
+
+    # initialize new columns as zeros
+    pri_jet0 = np.zeros(tx_.shape[0])
+    pri_jet1 = np.zeros(tx_.shape[0])
+    pri_jet2 = np.zeros(tx_.shape[0])
+    pri_jet3 = np.zeros(tx_.shape[0])
+
+    # set ones to appropriate columns
+    pri_jet0[inds0] = 1
+    pri_jet1[inds1] = 1
+    pri_jet2[inds2] = 1
+    pri_jet3[inds3] = 1
+    
+    # create separate datasets
+    tx_0 = tx_.copy()
+
+    # Features to remove for reduced tx_ 
+    cols_remove0 = []
+    cols_remove0.append(np.where(head_ == "DER_deltaeta_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_mass_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_prodeta_jet_jet")[0][0])
+    cols_remove0.append(np.where(head_ == "DER_lep_eta_centrality")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_subleading_pt")[0][0])
+    cols_remove0.append(np.where(head_ == "PRI_jet_subleading_eta")[0][0])
+
+    # cols to add for tx_1
+    cols_add1 = []
+    cols_add1.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
+    cols_add1.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
+
+    # remove features from all 
+    tx_0 = np.delete(tx_0, cols_remove0, axis=1)
+    tx_1 = tx_0.copy()
+    tx_2 = tx_0.copy()
+
+    # add back features to end of tx_0
+    tx_1 = np.column_stack((tx_1, tx_[:, cols_add1]))
+    tx_2 = np.column_stack((tx_0, tx_[:, cols_remove0]))
+
+    # filter tx_1 and tx_2 to keep only relevant jet#s
+    tx_1 = tx_1[inds1, :]
+    inds23 = np.append(inds2, inds3)
+    tx_2 = tx_2[inds23, :]
+
+    tx_0 = build_poly(tx_0, deg)
+    tx_1 = build_poly(tx_1, deg)
+    tx_2 = build_poly(tx_2, deg)
+
+    tx_0 = standardize(tx_0)
+    tx_1 = standardize(tx_1)
+    tx_2 = standardize(tx_2)
+
+    tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
+    tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
+    tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
+
+    # only add catergorical value when more than 1 jet# included
+    tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
+    tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
+    
+    # separate ids to restore order after separately predicting 
+    col_cat = np.where(headers=='PRI_jet_num')[0]
+    ids0 = ids[inds0]
+    ids1 = ids[inds1]
+    ids2 = ids[inds2]
+    ids3 = ids[inds3]
+    ids23 = np.append(ids2, ids3)
+    
+    # create subsets of tx_0 to predict with base model
+    tx_01 = tx_0[inds1]
+    tx_02 = tx_0[inds2]
+    tx_03 = tx_0[inds3]
+    tx_023 = np.concatenate((tx_02, tx_03), axis=0)
+    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    
+    data = []
+    data.append(tx_0)
+    data.append(tx_00)
+    data.append(tx_1)
+    data.append(tx_01)
+    data.append(tx_2)
+    data.append(tx_023)
+    
+    ids = []
+    ids.append(ids0)
+    ids.append(ids1)
+    ids.append(ids23)
+    
+    return  data, ids
+
+def create_predictions(weights, data, ids):
+    '''Takes list of weights and list of data matrices to create predictions.'''
+    weights0 = weights[0]
+    weights1 = weights[1]
+    weights2 = weights[2]
+
+    tx_0 = data[0]
+    tx_00 = data[1]
+    tx_1 = data[2]
+    tx_01 = data[3]
+    tx_2 = data[4]
+    tx_02 = data[5]
+    
+    ids0 = ids[0]
+    ids1 = ids[1]
+    ids23 = ids[2]
+
+    # predict labels for jet=0
+    y_pred0 = predict_labels01(weights0, tx_00)
+    y_pred0[y_pred0 < 0.6] = -1
+
+    # predictions for jet=1
+    y_pred1 = predict_labels01_comb(weights1, tx_1, weights0, tx_01)
+    y_pred1[y_pred1 < 0.6] = -1
+
+    # predictions for jet=23
+    y_pred2 = predict_labels01_comb(weights2, tx_2, weights0, tx_02)
+    y_pred2[y_pred2 < 0.6] = -1
+    
+    y_pred = np.vstack((y_pred0, y_pred1, y_pred2))
+
+    ids_final = np.append(ids0, ids1)
+    ids_final = np.append(ids_final, ids23)
+    ids_final = ids_final[:,np.newaxis]
+
+    # concatenate ids with preds
+    y_pred_ids = np.concatenate((ids_final, y_pred), axis=1)
+
+    # reorder predictions
+    y_pred_order = y_pred_ids[y_pred_ids[:,0].argsort()]
+
+    # remove ids column now that order is restored
+    print(y_pred_order[:10])
+    
+    y_pred_final = y_pred_order[:,1]
+    y_pred_final = y_pred_final[:, np.newaxis]
+    
+    return y_pred_final
+
+def predict_labels01_comb(weights1, data1, weights2, data2):
+    """Generates class predictions given weights, and a test data matrix"""
+    y_pred1 = np.dot(data1, weights1)
+    y_pred2 = np.dot(data2, weights2)
+    y_pred = 0.6*y_pred1 + 0.4*y_pred2
+    y_pred[np.where(y_pred <= 0.5)] = 0
+    y_pred[np.where(y_pred > 0.5)] = 1
+    
+    return y_pred
+
+def predict_labels01(weights, data):
+    """Generates class predictions given weights, and a test data matrix"""
+    y_pred = np.dot(data, weights)
+    y_pred[np.where(y_pred <= 0.5)] = 0
+    y_pred[np.where(y_pred > 0.5)] = 1
+    
+    return y_pred
