@@ -305,15 +305,9 @@ def replace_999_mean(tx, col):
     tx[inds_missing, col] = mean_        # replace all missing values with the mean
     
     return tx
-  
+    
     
 def process_features_train(tx, headers, y, deg):
-    
-    # category column
-    col_cat = np.where(headers=='PRI_jet_num')[0]
-    
-    # create ids to keep track of order
-    ids_ = np.arange(tx.shape[0])
     
     # remove features deemed useless from EDA
     tx_, head_ = remove_useless_cols(tx, headers)
@@ -321,16 +315,13 @@ def process_features_train(tx, headers, y, deg):
     # replace missing values in first feature with mean
     tx_ = replace_999_mean(tx_, 0)
     
-    # first determine the categorical columns
+    # determine indices of each jet#
     col = np.where(head_=='PRI_jet_num')[0]
     inds0 = np.where(tx_[:, col] == 0)[0]
     inds1 = np.where(tx_[:, col] == 1)[0]
     inds2 = np.where(tx_[:, col] == 2)[0]
     inds3 = np.where(tx_[:, col] == 3)[0]
 
-    # remove jet_num column
-    tx_ = np.delete(tx_, col, axis=1)
-    head_ = np.delete(head_, col)
 
     # initialize new columns as zeros
     pri_jet0 = np.zeros(tx_.shape[0])
@@ -343,6 +334,10 @@ def process_features_train(tx, headers, y, deg):
     pri_jet1[inds1] = 1
     pri_jet2[inds2] = 1
     pri_jet3[inds3] = 1
+    
+    # remove jet_num column
+    tx_ = np.delete(tx_, col, axis=1)
+    head_ = np.delete(head_, col)
     
     # create separate datasets
     tx_0 = tx_.copy()
@@ -363,7 +358,7 @@ def process_features_train(tx, headers, y, deg):
     cols_add1.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
     cols_add1.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
 
-    # remove features from all 
+    # remove features to create base dataset tx_0
     tx_0 = np.delete(tx_0, cols_remove0, axis=1)
     tx_1 = tx_0.copy()
     tx_2 = tx_0.copy()
@@ -372,37 +367,33 @@ def process_features_train(tx, headers, y, deg):
     tx_1 = np.column_stack((tx_1, tx_[:, cols_add1]))
     tx_2 = np.column_stack((tx_0, tx_[:, cols_remove0]))
 
-    # filter tx_1 and tx_2 to keep only relevant jet#s
+    # filter tx_1 and tx_2 to keep only relevant jet#
     tx_1 = tx_1[inds1, :]
     inds23 = np.append(inds2, inds3)
     tx_2 = tx_2[inds23, :]
     
-    y0 = y.copy()
-    y1 = y.copy()
-    y23 = y.copy()
-
-    y0 = y0[inds0]
-    y1 = y1[inds1]
-    y23 = y23[inds23] 
     
+    # expand features of each dataset
     tx_0 = build_poly(tx_0, deg)
     tx_1 = build_poly(tx_1, deg)
     tx_2 = build_poly(tx_2, deg)
-
+    
     tx_0 = standardize(tx_0)
     tx_1 = standardize(tx_1)
     tx_2 = standardize(tx_2)
-
-    tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
-    tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
-    tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
-
+    
     # only add catergorical value when more than 1 jet# included
     tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
     tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
     
+    # addition of bias column
+    tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
+    tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
+    tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
+
+    
     # create subsets of tx_0 to predict with base model
-    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    tx_00 = tx_0[inds0]
     tx_01 = tx_0[inds1]
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
@@ -417,23 +408,30 @@ def process_features_train(tx, headers, y, deg):
     data.append(tx_2)
     data.append(tx_023)
     
-    # create ids
-    ids0 = ids_[inds0]
-    ids1 = ids_[inds1]
-    ids2 = ids_[inds2]
-    ids3 = ids_[inds3]
-    ids23 = np.append(ids2, ids3)
+    # create ids for jets 2+3
+    ids23 = np.append(inds2, inds3)
     
     ids = []
     ids.append(inds0)
     ids.append(inds1)
     ids.append(ids23)
     
-    # Create target y values
-    y01 = y
+    
+    
+    # create corresponding y vectors for each jet#
+    y0 = y.copy()
+    y1 = y.copy()
+    y23 = y.copy()
+
+    y0 = y0[inds0]
+    y1 = y1[inds1]
+    y23 = y23[inds23] 
+    
+    # Create target y values with 0,1 instead of -1,1
+    y01 = y.copy()
     y01[y01 < 0] = 0
     
-    y001 = y0 
+    y001 = y0.copy() 
     y001[y001 < 0] = 0
     
     y101 = y1 
@@ -453,9 +451,6 @@ def process_features_train(tx, headers, y, deg):
 
 def process_features_test(tx, headers, ids, deg):
     
-    # category column
-    col_cat = np.where(headers=='PRI_jet_num')[0]
-    
     # remove features deemed useless from EDA
     tx_, head_ = remove_useless_cols(tx, headers)
     
@@ -468,11 +463,7 @@ def process_features_test(tx, headers, ids, deg):
     inds1 = np.where(tx_[:, col] == 1)[0]
     inds2 = np.where(tx_[:, col] == 2)[0]
     inds3 = np.where(tx_[:, col] == 3)[0]
-
-    # remove jet_num column
-    tx_ = np.delete(tx_, col, axis=1)
-    head_ = np.delete(head_, col)
-
+    
     # initialize new columns as zeros
     pri_jet0 = np.zeros(tx_.shape[0])
     pri_jet1 = np.zeros(tx_.shape[0])
@@ -484,6 +475,10 @@ def process_features_test(tx, headers, ids, deg):
     pri_jet1[inds1] = 1
     pri_jet2[inds2] = 1
     pri_jet3[inds3] = 1
+    
+    # remove jet_num column
+    tx_ = np.delete(tx_, col, axis=1)
+    head_ = np.delete(head_, col)
     
     # create separate datasets
     tx_0 = tx_.copy()
@@ -504,12 +499,12 @@ def process_features_test(tx, headers, ids, deg):
     cols_add1.append(np.where(head_ == "PRI_jet_leading_pt")[0][0])
     cols_add1.append(np.where(head_ == "PRI_jet_leading_eta")[0][0])
 
-    # remove features from all 
+    # remove features from tx_ to create base dataset tx_0
     tx_0 = np.delete(tx_0, cols_remove0, axis=1)
     tx_1 = tx_0.copy()
     tx_2 = tx_0.copy()
 
-    # add back features to end of tx_0
+    # add back features to end of tx_0 to create tx_1 and tx_2
     tx_1 = np.column_stack((tx_1, tx_[:, cols_add1]))
     tx_2 = np.column_stack((tx_0, tx_[:, cols_remove0]))
 
@@ -518,6 +513,7 @@ def process_features_test(tx, headers, ids, deg):
     inds23 = np.append(inds2, inds3)
     tx_2 = tx_2[inds23, :]
 
+    # expand features and standardize
     tx_0 = build_poly(tx_0, deg)
     tx_1 = build_poly(tx_1, deg)
     tx_2 = build_poly(tx_2, deg)
@@ -525,17 +521,18 @@ def process_features_test(tx, headers, ids, deg):
     tx_0 = standardize(tx_0)
     tx_1 = standardize(tx_1)
     tx_2 = standardize(tx_2)
+    
+    # only add catergorical value when more than 1 jet# included
+    tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
+    tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
 
+    # add bias feature
     tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
     tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
     tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
 
-    # only add catergorical value when more than 1 jet# included
-    tx_0 = np.column_stack((tx_0,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
-    tx_2 = np.column_stack((tx_2, pri_jet2[inds23], pri_jet3[inds23]))
     
     # separate ids to restore order after separately predicting 
-    col_cat = np.where(headers=='PRI_jet_num')[0]
     ids0 = ids[inds0]
     ids1 = ids[inds1]
     ids2 = ids[inds2]
@@ -543,11 +540,12 @@ def process_features_test(tx, headers, ids, deg):
     ids23 = np.append(ids2, ids3)
     
     # create subsets of tx_0 to predict with base model
+    tx_00 = tx_0[inds0]
     tx_01 = tx_0[inds1]
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
     tx_023 = np.concatenate((tx_02, tx_03), axis=0)
-    tx_00 = tx_0[np.squeeze(tx[:,col_cat] == 0)]
+    
     
     data = []
     data.append(tx_0)
@@ -606,8 +604,6 @@ def create_predictions(weights, data, ids):
     y_pred_order = y_pred_ids[y_pred_ids[:,0].argsort()]
 
     # remove ids column now that order is restored
-    print(y_pred_order[:10])
-    
     y_pred_final = y_pred_order[:,1]
     y_pred_final = y_pred_final[:, np.newaxis]
     
