@@ -69,7 +69,8 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
         w = w - gamma*grad   
         
         # log info only at certain steps and at the last step.
-        if n_iter % 1000 == 0 or n_iter == max_iters-1:
+        # n_iter % 1000 == 0 or 
+        if n_iter == max_iters-1:
             loss = calculate_loss_lr(y, tx, w)
             print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
     
@@ -470,12 +471,11 @@ def logistic_regression_demo(y, tx, max_iters, gamma):
     
     return w_
 
-def logistic_regression_demo_winit(y, tx, max_iters, gamma):
+def logistic_regression_demo_winit(y, tx, w_init, max_iters, gamma):
     """polynomial regression with different split ratios and different degrees."""
-    w_init = w_1.copy()
     # re-use weights from first model
     w_init[-4:] = 0
-    w_init.resize(tx.shape[1],1)
+    w_init = np.resize(w_init, (tx.shape[1],1))
     
     x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
     
@@ -483,7 +483,6 @@ def logistic_regression_demo_winit(y, tx, max_iters, gamma):
     
     # modified helper functions returns 0 or 1
     pred = predict_labels01(w_, x_test)
-    
     error_te = 0
     for i in range(y_test.shape[0]):
             error = np.abs(y_test[i] - pred[i])
