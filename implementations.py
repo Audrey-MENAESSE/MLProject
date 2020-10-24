@@ -262,6 +262,7 @@ def calculate_loss_lr_reg(y, tx, lambda_, w):
     loss = 0
     for i in range(y.shape[0]):
         loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
+    loss = loss/y.shape[0]
     return loss
 
 
@@ -450,6 +451,48 @@ def process_features_train(tx, headers, y, deg):
     
     return  data, targets, ids
 
+def logistic_regression_demo(y, tx, max_iters, gamma):
+    """polynomial regression with different split ratios and different degrees."""
+    w_init = np.zeros((tx.shape[1], 1))
+    
+    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
+    
+    w_, loss_tr = logistic_regression(y_train, x_train, w_init, max_iters, gamma)
+    
+    # modified helper functions returns 0 or 1
+    pred = predict_labels01(w_, x_test)
+
+    error_te = 0
+    for i in range(y_test.shape[0]):
+            error = np.abs(y_test[i] - pred[i])
+            error_te = error_te + error    
+   
+    print('Proportion test error: ', error_te/y_test.shape[0])
+    
+    return w_
+
+def logistic_regression_demo_winit(y, tx, max_iters, gamma):
+    """polynomial regression with different split ratios and different degrees."""
+    w_init = w_1.copy()
+    # re-use weights from first model
+    w_init[-4:] = 0
+    w_init.resize(tx.shape[1],1)
+    
+    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
+    
+    w_, loss_tr = logistic_regression(y_train, x_train, w_init, max_iters, gamma)
+    
+    # modified helper functions returns 0 or 1
+    pred = predict_labels01(w_, x_test)
+    
+    error_te = 0
+    for i in range(y_test.shape[0]):
+            error = np.abs(y_test[i] - pred[i])
+            error_te = error_te + error    
+   
+    print('Proportion test error: ', error_te/y_test.shape[0])
+    
+    return w_
 
 def process_features_test(tx, headers, ids, deg):
     
