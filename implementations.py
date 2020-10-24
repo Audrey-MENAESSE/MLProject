@@ -147,25 +147,8 @@ def standardize(x):
     x = (x-np.mean(x, axis=0))/np.std(x, axis=0)
     return x
 
-def PCA_bias (tX) :
-    m, n = tX.shape
-    dataset=tX
-    dataset -= tX.mean(axis=0)
-    R = np.cov(dataset, rowvar=False)
-    evals, evects = np.linalg.eigh(R)
-    # Sorting the eigenvalues in a decreasing order
-    index = np.argsort(evals)[::-1]
-    evals = evals[index]
-    evects = evects[:,index]
-    #evects = evects[:, :n_features]
-    data = np.dot(evects.T, dataset.T).T
-    
-    # Adding the bias term of the model
-    data_ones = np.c_[np.ones((len(tX), 1)), data]
-    
-    return (data_ones)
 
-def build_poly2 (tX, degree):
+def build_poly (tX, degree):
     N= len(tX[0])
     new_tX = np.ones(tX.shape[0])
     for i in range(N):
@@ -174,16 +157,8 @@ def build_poly2 (tX, degree):
         feature=feature.reshape(-1,1)
         ft = feature**(j)
         new_tX = np.column_stack((new_tX, ft))
-    new_tX = np.delete(new_tX, 0, axis=1)
     return new_tX
 
-def build_poly(x, degree):
-    # This seems simpler
-    x_poly = np.ones(len(x))[:,None]
-    for i in range(degree):
-        pol = x**(i+1)
-        x_poly = np.concatenate((x_poly, pol), axis=1)
-    return x_poly
 
 
 def arrange_data (tX, headers, degree):
@@ -192,7 +167,6 @@ def arrange_data (tX, headers, degree):
     data = build_poly(data, degree)
     data = standardize (data)
     data = np.c_[data, cat]
-    # data = PCA_bias(data)
     return data
 
 
@@ -207,10 +181,6 @@ def split_data(x, y, ratio, seed=1):
     """
     # set seed
     np.random.seed(seed)
-    # ***************************************************
-    # INSERT YOUR CODE HERE
-    # split the data based on the given ratio: TODO
-    # ***************************************************
     # randomly select ratio of inds
     n = np.floor(ratio*x.shape[0]).astype('int')
     inds = np.random.choice(x.shape[0], n, replace=False) 
@@ -220,38 +190,6 @@ def split_data(x, y, ratio, seed=1):
     y_test = np.delete(y, inds)
     
     return x_train, y_train, x_test, y_test
-
-
-def batch_iter(y, tx, batch_size, num_batches=1, shuffle=True):
-    """
-    Generate a minibatch iterator for a dataset.
-    Takes as input two iterables (here the output desired values 'y' and the input data 'tx')
-    Outputs an iterator which gives mini-batches of `batch_size` matching elements from `y` and `tx`.
-    Data can be randomly shuffled to avoid ordering in the original data messing with the randomness of the minibatches.
-    Example of use :
-    for minibatch_y, minibatch_tx in batch_iter(y, tx, 32):
-        <DO-SOMETHING>
-    """
-    data_size = len(y)
-
-    if shuffle:
-        shuffle_indices = np.random.permutation(np.arange(data_size))
-        shuffled_y = y[shuffle_indices]
-        shuffled_tx = tx[shuffle_indices]
-    else:
-        shuffled_y = y
-        shuffled_tx = tx
-    for batch_num in range(num_batches):
-        start_index = batch_num * batch_size
-        end_index = min((batch_num + 1) * batch_size, data_size)
-        if start_index != end_index:
-            yield shuffled_y[start_index:end_index], shuffled_tx[start_index:end_index]
-            
-
-def standardize(x):
-    ''' Standardize each column of the input. '''
-    x = (x-np.mean(x, axis=0))/np.std(x, axis=0)
-    return x
 
 
     # ***************************************************
@@ -367,7 +305,7 @@ def replace_999_mean(tx, col):
     tx[inds_missing, col] = mean_        # replace all missing values with the mean
     
     return tx
-    
+  
     
 def process_features_train(tx, headers, y, deg):
     
