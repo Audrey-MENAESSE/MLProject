@@ -243,7 +243,6 @@ def calculate_loss_lr(y, tx, w):
     loss = 0
     for i in range(y.shape[0]):
         loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
-    loss = loss/y.shape[0]
     return loss
 
 
