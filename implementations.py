@@ -82,7 +82,7 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     # start the logistic regression
     for n_iter in range(max_iters):
         
-        i = np.random.permutation(np.arange(0, tx.shape[0]))[0]
+        i = np.random.choice(np.arange(len(y)))
         grad = calculate_gradient_lr_reg(y[i:i+1], tx[i:i+1], lambda_, w)
         w = w - gamma*grad   
         
@@ -157,6 +157,7 @@ def build_poly (tX, degree):
         feature=feature.reshape(-1,1)
         ft = feature**(j)
         new_tX = np.column_stack((new_tX, ft))
+    new_tX = np.delete(new_tX, 0, axis=1)
     return new_tX
 
 
