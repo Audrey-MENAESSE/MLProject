@@ -1,7 +1,7 @@
 import numpy as np
 
-from functions import *
-from proj1_helpers_local import *
+from implementations import *
+from proj1_helpers import *
 
 # Load data
 DATA_TRAIN_PATH = 'train.csv' 
@@ -9,18 +9,18 @@ y, tX, ids, headers = load_csv_data(DATA_TRAIN_PATH) # Modified the load_csv_dat
 
 
 # process features for to train the model
-degree = 3
+degree = 2  # hardcoded value found from cross-validation
 data, targets, ids = process_features_train(tX, headers, y, degree)
 
 
 # train base model 
-w_1 = logistic_regression_demo(targets[0], data[0], max_iters=50000, gamma=0.01)
+w_1 = logistic_regression_model(targets[0], data[0], max_iters=250000, gamma=0.01)
 
 # train jet=1 model using base model weights as initial weights
-w_2 = logistic_regression_model_winit(targets[1], data[2], max_iters=15000, gamma=0.01)
+w_2 = logistic_regression_model_winit(targets[2], data[2], w_1, max_iters=50000, gamma=0.01)
 
 # train jet=2/3 model using base model weights as initial weights
-w_3 = logistic_regression_model_winit(targets[2], data[4], max_iters=15000, gamma=0.01)
+w_3 = logistic_regression_model_winit(targets[3], data[4], w_1, max_iters=50000, gamma=0.01)
 
 
 # Load test prediction data
@@ -31,7 +31,7 @@ _, tX_test, ids_test, headers = load_csv_data(DATA_TEST_PATH)
 data, ids = process_features_test(tX_test, headers, ids_test, degree)
 
 # create Predictions
-weights = [w_11, w_2, w_3]
+weights = [w_1, w_2, w_3]
 y_pred_final = create_predictions(weights, data, ids)
 
 # create output csv file
