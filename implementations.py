@@ -18,7 +18,7 @@ def least_squares_GD(y, tx, initial_w, max_iters, gamma):
             loss = compute_loss_mse2(y, tx, w)
             print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
 
-    return loss, w
+    return w, loss
 
 
 def least_squares_SGD(y, tx, initial_w, max_iters, gamma):
@@ -34,8 +34,7 @@ def least_squares_SGD(y, tx, initial_w, max_iters, gamma):
             loss = compute_loss_mse(y, tx, w)
             print("Gradient Descent({bi}/{ti}): loss={l}".format(bi=n_iter, ti=max_iters - 1, l=loss))
         
-    return loss, w
-
+    return w, loss
 
 def least_squares(y, tx):
     """calculate the least squares solution."""
@@ -70,10 +69,9 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
         w = w - gamma*grad   
         
         # log info only at certain steps and at the last step.
-        # n_iter % 1000 == 0 or 
-        if n_iter == max_iters-1:
+        if n_iter % 1000 == 0 or n_iter == max_iters-1:
             loss = calculate_loss_lr(y, tx, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+            #print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
     
     return w, loss
 
@@ -91,58 +89,81 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
         # log info only at certain steps
         if n_iter % 1000 == 0 or n_iter == max_iters-1:
             loss = calculate_loss_lr_reg(y, tx, lambda_, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+            #print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
     
     return w, loss
 
+# ***************************************************
+#  Loss Functions
+# ***************************************************
+
+def compute_loss_mse(y, tx, w):
+    """Calculate the mse loss."""
+    return 0.5*((y-tx.dot(w))**2).mean()
+
+def compute_loss_mse_loop(y, tx, w):
+    """compute the loss mse. With for loop because of memory error"""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + ((y[i]-tx[i].dot(w))**2)
+    return 0.5*loss/y.shape[0]
+
+def calculate_loss_lr(y, tx, w):
+    """compute the loss: negative log likelihood. With for loop to avoid memory error of Matrix Ops."""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
+    return loss
+
+def calculate_loss_lr_norm(y, tx, w):
+    """compute the loss: negative log likelihood. With for loop to avoid memory error of Matrix Ops.
+       This loss is normalized by # of data points to allow comparison between attempts."""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
+    return loss/y.shape[0]
+
+def calculate_loss_lr_reg(y, tx, lambda_, w):
+    """compute the regularized loss: negative log likelihood. With for loop because of memory error"""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1 + np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
+    return loss
+
+def calculate_loss_lr_reg_norm(y, tx, lambda_, w):
+    """compute the regularized loss: negative log likelihood. With for loop because of memory error"""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1 + np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
+    return loss/y.shape[0]
+
+# ***************************************************
+#  Calculate Gradient Functions
+# ***************************************************
+
+def compute_gradient_ls(y, tx, w):
+    """Compute the gradient for Least Squares."""
+
+    err = y[:, np.newaxis] - tx.dot(w);
+    grad = -1/len(y) * tx.T.dot(err)
+    
+    return grad
+
+def calculate_gradient_lr(y, tx, w):
+    """compute the gradient of loss for Logistic Regression."""
+    return tx.T.dot(sigmoid(tx.dot(w))-y)
+
+def calculate_gradient_lr_reg(y, tx, lambda_, w):
+    """compute the gradient of loss for Logistic Regression."""
+    return tx.T.dot(sigmoid(tx.dot(w))-y) + lambda_*w
     
 # ***************************************************
 #  Useful Functions
 # ***************************************************
-""" Feature Processing functions """
-# Replacing the missing values by the average 
-def replace_missing (tX):
-    for i in range(len(tX[0])):
-        average = np.mean(tX[tX[:,i]!=-999, i])
-        inds = np.where(tX[:,i]==-999)
-        tX[inds, i] = average
-    return tX
-
-def cat_features (tX, headers) :
-    # Finding the number of the column containing the categorical feature
-    col = np.where(headers=='PRI_jet_num')[0]
     
-    # The possible entries of feature PRI_jet_num are 0, 1, 2, 3
-    inds0 = np.where(tX[:, col] == 0)[0]
-    inds1 = np.where(tX[:, col] == 1)[0]
-    inds2 = np.where(tX[:, col] == 2)[0]
-    inds3 = np.where(tX[:, col] == 3)[0]
-
-    # initialize new columns as zeros
-    pri_jet0 = np.zeros(tX.shape[0])
-    pri_jet1 = np.zeros(tX.shape[0])
-    pri_jet2 = np.zeros(tX.shape[0])
-    pri_jet3 = np.zeros(tX.shape[0])
-
-    # set ones to appropriate columns
-    pri_jet0[inds0] = 1
-    pri_jet1[inds1] = 1
-    pri_jet2[inds2] = 1
-    pri_jet3[inds3] = 1
-
-    # create a vector with the new categorical features
-    new_cat = np.column_stack((pri_jet0, pri_jet1, pri_jet2, pri_jet3))
-    
-    # delete original jet_num column
-    tX = np.delete(tX, col, axis=1)
-    headers = np.delete(headers, col)
-    
-    # append new columns
-    #tX = np.column_stack((tX,pri_jet0, pri_jet1, pri_jet2, pri_jet3))
-    new_heads = ['pri_jet_num0', 'pri_jet_num1', 'pri_jet_num2', 'pri_jet_num3']
-    #head_ = np.append(head_, new_heads)
-    
-    return tX, new_cat
+def sigmoid(t):
+    """apply the sigmoid function on t."""
+    return np.exp(t) / (1 + np.exp(t))
 
 def standardize(x):
     ''' Standardize each column of the input. '''
@@ -163,19 +184,6 @@ def build_poly (tX, degree):
     return new_tX
 
 
-
-def arrange_data (tX, headers, degree):
-    data = replace_missing (tX)
-    data, cat = cat_features (data, headers)    
-    data = build_poly(data, degree)
-    data = standardize (data)
-    data = np.c_[data, cat]
-    return data
-
-
-
-""" Data splitting functions """
-
 def split_data(x, y, ratio, seed=1):
     """
     split the dataset based on the split ratio. If ratio is 0.8 
@@ -195,97 +203,90 @@ def split_data(x, y, ratio, seed=1):
     return x_train, y_train, x_test, y_test
 
 
-    # ***************************************************
-    #  Least squares with Gradient Descent
-    # ***************************************************
-
-def compute_gradient_ls(y, tx, w):
-    """Compute the gradient."""
-
-    err = y[:, np.newaxis] - tx.dot(w);
-    grad = -1/len(y) * tx.T.dot(err)
-    
-    return grad
-
-
-def compute_loss_mse(y, tx, w):
-    """Calculate the mse loss."""
-    return 0.5*((y-tx.dot(w))**2).mean()
-
-def compute_loss_mse_loop(y, tx, w):
-    """compute the loss mse. With for loop because of memory error"""
-    loss = 0
-    for i in range(y.shape[0]):
-        loss = loss + ((y[i]-tx[i].dot(w))**2)
-    return 0.5*loss/y.shape[0]
-
-
-
-
-def calculate_loss_mse2(y, tx, w):
-    """compute mse loss: for loop because of memory error"""
-    loss = 0
-    for i in range(y.shape[0]):
-        loss = loss + 0.5*((y[i]-tx[i].dot(w))**2)
-    return loss/y.shape[0]
-
-
-    # ***************************************************
-    #  Logistic Regression Functions
-    # ***************************************************
-
-    
-def sigmoid(t):
-    """apply the sigmoid function on t."""
-    return np.exp(t) / (1 + np.exp(t))
-
-
-def calculate_loss_lr(y, tx, w):
-    """compute the loss: negative log likelihood. With for loop to avoid memory error of Matrix Ops."""
-    loss = 0
-    for i in range(y.shape[0]):
-        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
-    return loss/y.shape[0]
-
-
-def calculate_gradient_lr(y, tx, w):
-    """compute the gradient of loss for Logistic Regression."""
-    return tx.T.dot(sigmoid(tx.dot(w))-y)
-
-
-
-
-    # ***************************************************
-    #  Regularized Logistic Regression Functions
-    # ***************************************************
-    
-
-def calculate_loss_lr_reg(y, tx, lambda_, w):
-    """compute the regularized loss: negative log likelihood. With for loop because of memory error"""
-    loss = 0
-    for i in range(y.shape[0]):
-        loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
-    return loss/y.shape[0]
-
-
-def calculate_gradient_lr_reg(y, tx, lambda_, w):
-    """compute the gradient of loss for Logistic Regression."""
-    return tx.T.dot(sigmoid(tx.dot(w))-y) + lambda_*w
-
 
 
 def calculate_accuracy (y_test, x_test, coeffs) :
+    """ Calculates the accuracy of our model. """
     y_pred = x_test.dot(coeffs)
     acc = np.sum(y_pred==y_test)/len(y_test)
     print("There are {acc} % of correct predictions".format(
               acc = accuracy))
 
     
-    # ***************************************************
-    #  MEGA MODEL
-    # ***************************************************
+    
     
 
+
+    
+    # ***************************************************
+    #  FINAL MODEL
+    # ***************************************************
+    
+# Implementations functions
+def logistic_regression_mod(y, tx, initial_w, max_iters, gamma):
+    """compute the gradient of loss for Logistic Regression. Hard coded mini-batch size of 1.
+       Mod version to use normalized loss function in order to compare accross runs"""
+    w = initial_w
+    
+    # start the logistic regression
+    for n_iter in range(max_iters):
+        
+        i = np.random.choice(np.arange(len(y)))
+        
+        grad = calculate_gradient_lr(y[i:i+1], tx[i:i+1], w)
+        w = w - gamma*grad   
+        
+        # log info only at certain steps and at the last step.
+        if n_iter % 1000 == 0 or n_iter == max_iters-1:
+            loss = calculate_loss_lr_norm(y, tx, w)
+            #print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+    
+    return w, loss
+
+def logistic_regression_demo(y, tx, max_iters, gamma):
+    """polynomial regression with different split ratios and different degrees."""
+    w_init = np.zeros((tx.shape[1], 1))
+    
+    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
+    
+    w_, loss_tr = logistic_regression_mod(y_train, x_train, w_init, max_iters, gamma)
+    
+    # modified helper functions returns 0 or 1
+    pred = predict_labels01(w_, x_test)
+
+    error_te = 0
+    for i in range(y_test.shape[0]):
+            error = np.abs(y_test[i] - pred[i])
+            error_te = error_te + error    
+   
+    print('Proportion test error: ', error_te/y_test.shape[0])
+    
+    return w_
+
+def logistic_regression_demo_winit(y, tx, w_init, max_iters, gamma):
+    """polynomial regression with different split ratios and different degrees.
+       Here, we submit an initial weights vector obtained from previous sub-model"""
+    # re-use weights from first model
+    w_init = w_init
+    w_init[-4:] = 0
+    w_init = np.resize(w_init, (tx.shape[1],1))
+    
+    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
+    
+    w_, loss_tr = logistic_regression_mod(y_train, x_train, w_init, max_iters, gamma)
+    
+    # modified helper functions returns 0 or 1
+    pred = predict_labels01(w_, x_test)
+    error_te = 0
+    for i in range(y_test.shape[0]):
+            error = np.abs(y_test[i] - pred[i])
+            error_te = error_te + error    
+   
+    print('Proportion test error: ', error_te/y_test.shape[0])
+    
+    return w_
+
+# Feature Processing
 def remove_useless_cols(tx, headers):
     """Remove features deemed to have no useful information."""
     cols_remove = []
@@ -311,6 +312,8 @@ def replace_999_mean(tx, col):
     
     
 def process_features_train(tx, headers, y, deg):
+    """ Processes tx to output 3 separate datasets and targets based on
+        PRI_jet_num. (For training step) """
     
     # remove features deemed useless from EDA
     tx_, head_ = remove_useless_cols(tx, headers)
@@ -375,7 +378,6 @@ def process_features_train(tx, headers, y, deg):
     inds23 = np.append(inds2, inds3)
     tx_2 = tx_2[inds23, :]
     
-    
     # expand features of each dataset
     tx_0 = build_poly(tx_0, deg)
     tx_1 = build_poly(tx_1, deg)
@@ -393,7 +395,6 @@ def process_features_train(tx, headers, y, deg):
     tx_0 = np.c_[np.ones(tx_0.shape[0]), tx_0]
     tx_1 = np.c_[np.ones(tx_1.shape[0]), tx_1]
     tx_2 = np.c_[np.ones(tx_2.shape[0]), tx_2]
-
     
     # create subsets of tx_0 to predict with base model
     tx_00 = tx_0[inds0]
@@ -401,7 +402,6 @@ def process_features_train(tx, headers, y, deg):
     tx_02 = tx_0[inds2]
     tx_03 = tx_0[inds3]
     tx_023 = np.concatenate((tx_02, tx_03), axis=0)
-    
     
     data = []
     data.append(tx_0)
@@ -449,49 +449,9 @@ def process_features_train(tx, headers, y, deg):
     
     return  data, targets, ids
 
-def logistic_regression_demo(y, tx, max_iters, gamma):
-    """polynomial regression with different split ratios and different degrees."""
-    w_init = np.zeros((tx.shape[1], 1))
-    
-    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
-    
-    w_, loss_tr = logistic_regression(y_train, x_train, w_init, max_iters, gamma)
-    
-    # modified helper functions returns 0 or 1
-    pred = predict_labels01(w_, x_test)
-
-    error_te = 0
-    for i in range(y_test.shape[0]):
-            error = np.abs(y_test[i] - pred[i])
-            error_te = error_te + error    
-   
-    print('Proportion test error: ', error_te/y_test.shape[0])
-    
-    return w_
-
-def logistic_regression_demo_winit(y, tx, w_init, max_iters, gamma):
-    """polynomial regression with different split ratios and different degrees."""
-    # re-use weights from first model
-    w_init = w_init
-    w_init[-4:] = 0
-    w_init = np.resize(w_init, (tx.shape[1],1))
-    
-    x_train, y_train, x_test, y_test = split_data(tx, y, ratio=0.8, seed=1)
-    
-    w_, loss_tr = logistic_regression(y_train, x_train, w_init, max_iters, gamma)
-    
-    # modified helper functions returns 0 or 1
-    pred = predict_labels01(w_, x_test)
-    error_te = 0
-    for i in range(y_test.shape[0]):
-            error = np.abs(y_test[i] - pred[i])
-            error_te = error_te + error    
-   
-    print('Proportion test error: ', error_te/y_test.shape[0])
-    
-    return w_
-
 def process_features_test(tx, headers, ids, deg):
+    """ Processes tx to output 3 separate datasets based on PRI_jet_num. 
+        Keeps track of indices for ordering of predictions. (For test step) """
     
     # remove features deemed useless from EDA
     tx_, head_ = remove_useless_cols(tx, headers)
@@ -604,8 +564,31 @@ def process_features_test(tx, headers, ids, deg):
     
     return  data, ids
 
+# Create predictions
+
+def predict_labels01_comb(weights1, data1, weights2, data2):
+    """Generates class predictions (0,1) given weights, and a test data matrix.
+       Uses a combination of two sub-model predictions."""
+    y_pred1 = np.dot(data1, weights1)
+    y_pred2 = np.dot(data2, weights2)
+    y_pred = 0.6*y_pred1 + 0.4*y_pred2
+    y_pred[np.where(y_pred <= 0)] = 0
+    y_pred[np.where(y_pred > 0)] = 1
+    
+    return y_pred
+
+
+def predict_labels01(weights, data):
+    """Generates class predictions (0,1) given weights, and a test data matrix"""
+    y_pred = np.dot(data, weights)
+    y_pred[np.where(y_pred <= 0)] = 0
+    y_pred[np.where(y_pred > 0)] = 1
+    
+    return y_pred
+
+
 def create_predictions(weights, data, ids):
-    '''Takes list of weights and list of data matrices to create predictions.'''
+    '''Takes list of weights and list of data matrices to create final predictions.'''
     weights0 = weights[0]
     weights1 = weights[1]
     weights2 = weights[2]
@@ -651,20 +634,75 @@ def create_predictions(weights, data, ids):
     
     return y_pred_final
 
-def predict_labels01_comb(weights1, data1, weights2, data2):
-    """Generates class predictions given weights, and a test data matrix"""
+# To calculate log-likelihood loss with final model
+
+def create_predictions_loss(weights, data, ids):
+    '''Takes list of weights and list of data matrices to create predictions.
+       Here we output the loss without the thresholding to 0 or 1 in order
+       to use it in the negative log-likelihood loss funciton.'''
+    weights0 = weights[0]
+    weights1 = weights[1]
+    weights2 = weights[2]
+
+    tx_0 = data[0]
+    tx_00 = data[1]
+    tx_1 = data[2]
+    tx_01 = data[3]
+    tx_2 = data[4]
+    tx_02 = data[5]
+    
+    ids0 = ids[0]
+    ids1 = ids[1]
+    ids23 = ids[2]
+
+    # predict labels for jet=0
+    y_pred0 = predict_labels01_loss(weights0, tx_00)
+
+    # predictions for jet=1
+    y_pred1 = predict_labels01_comb_loss(weights1, tx_1, weights0, tx_01)
+
+    # predictions for jet=23
+    y_pred2 = predict_labels01_comb_loss(weights2, tx_2, weights0, tx_02)
+    
+    y_pred = np.vstack((y_pred0, y_pred1, y_pred2))
+
+    ids_final = np.append(ids0, ids1)
+    ids_final = np.append(ids_final, ids23)
+    ids_final = ids_final[:,np.newaxis]
+
+    # concatenate ids with preds
+    y_pred_ids = np.concatenate((ids_final, y_pred), axis=1)
+
+    # reorder predictions
+    y_pred_order = y_pred_ids[y_pred_ids[:,0].argsort()]
+
+    # remove ids column now that order is restored
+    y_pred_final = y_pred_order[:,1]
+    y_pred_final = y_pred_final[:, np.newaxis]
+    
+    return y_pred_final
+
+def predict_labels01_comb_loss(weights1, data1, weights2, data2):
+    """Generates predictions given weights, and data matrices.
+       Here we do not threshold to 0,1"""
     y_pred1 = np.dot(data1, weights1)
     y_pred2 = np.dot(data2, weights2)
     y_pred = 0.6*y_pred1 + 0.4*y_pred2
-    y_pred[np.where(y_pred <= 0.5)] = 0
-    y_pred[np.where(y_pred > 0.5)] = 1
     
     return y_pred
 
-def predict_labels01(weights, data):
-    """Generates class predictions given weights, and a test data matrix"""
+def predict_labels01_loss(weights, data):
+    """Generates predictions given weights, and data matrices.
+       Here we do not threshold to 0,1"""
     y_pred = np.dot(data, weights)
-    y_pred[np.where(y_pred <= 0.5)] = 0
-    y_pred[np.where(y_pred > 0.5)] = 1
     
     return y_pred
+
+def calculate_loss_lr_model(y, pred):
+    """compute the loss: negative log likelihood. With for loop to 
+       avoid memory error of Matrix Ops.  Modified to work with our 
+       final model. y must be between 0 and 1"""
+    loss = 0
+    for i in range(y.shape[0]):
+        loss = loss + np.log(1+np.exp(pred[i])) - y[i]*(pred[i])
+    return loss/y.shape[0]
