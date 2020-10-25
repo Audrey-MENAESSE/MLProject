@@ -789,3 +789,119 @@ def cross_validation(y, x, ids, degrees):
         accuracy[degree-1] = np.array(acc_d)
     
     return loss, accuracy
+
+# ********************************
+# Bias - Variance Plots
+# ********************************
+
+def bias_variance_decomposition_visualization(degrees, rmse_tr, rmse_te):
+    """visualize the bias variance decomposition."""
+    rmse_tr_mean = np.expand_dims(np.mean(rmse_tr, axis=0), axis=0)
+    rmse_te_mean = np.expand_dims(np.mean(rmse_te, axis=0), axis=0)
+    plt.plot(
+        degrees,
+        rmse_tr.T,
+        'b',
+        linestyle="-",
+        color=([0.7, 0.7, 1]),
+        #label='train',
+        linewidth=0.3)
+    plt.plot(
+        degrees,
+        rmse_te.T,
+        'r',
+        linestyle="-",
+        color=[1, 0.7, 0.7],
+        #label='test',
+        linewidth=0.3)
+    plt.plot(
+        degrees,
+        rmse_tr_mean.T,
+        'b',
+        linestyle="-",
+        label='train',
+        linewidth=3)
+    plt.plot(
+        degrees,
+        rmse_te_mean.T,
+        'r',
+        linestyle="-",
+        label='test',
+        linewidth=3)
+    #plt.ylim(0.2, 0.7)
+    plt.xlabel("degree")
+    plt.ylabel("error")
+    plt.legend(loc=2)
+    plt.title("Bias-Variance Decomposition - Baseline Model")
+    plt.savefig("bias_variance_base_model")
+    
+def bias_variance_baseline():
+    """The entry."""
+    # define parameters
+    seeds = range(2c0)
+    ratio_train = 0.8
+    degrees = range(1, 10)
+    gamma = 0.01
+    max_iters = 10000
+    
+    # define list to store the variable
+    loss_tr = np.empty((len(seeds), len(degrees)))
+    loss_te = np.empty((len(seeds), len(degrees)))
+    
+    for index_seed, seed in enumerate(seeds):
+        np.random.seed(seed)
+     
+        x_train, y_train, x_test, y_test = split_data(tX, y, ratio_train, seed)
+
+  
+        for index_degree, degree in enumerate(degrees):
+            data_tr, targets_tr, ids_tr = process_features_train(x_train, headers, y_train, degree)
+            data_te, targets_te, ids_te = process_features_train(x_test, headers, y_test, degree)
+           
+            w_, losstr= logistic_regression_model(targets_tr[0], data_tr[0], max_iters, gamma)
+            losste = calculate_loss_lr_norm(targets_te[0], data_te[0], w_)
+            
+            loss_tr[index_seed, index_degree] = losstr
+            loss_te[index_seed, index_degree] = losste
+
+    bias_variance_decomposition_visualization(degrees, loss_tr, loss_te)
+    
+    return degrees, loss_tr, loss_te
+
+def bias_variance_model():
+    """The entry."""
+    # define parameters
+    seeds = range(20)
+    ratio_train = 0.8
+    degrees = range(1, 10)
+    
+    # define list to store the variable
+    loss_tr_model = np.empty((len(seeds), len(degrees)))
+    loss_te_model = np.empty((len(seeds), len(degrees)))
+    
+    for index_seed, seed in enumerate(seeds):
+        np.random.seed(seed)
+ 
+        x_train, y_train, x_test, y_test = split_data(tX, y, ratio_train, seed)
+
+        for index_degree, degree in enumerate(degrees):
+            data_tr, targets_tr, ids_tr = process_features_train(x_train, headers, y_train, degree)
+            data_te, targets_te, ids_te = process_features_train(x_test, headers, y_test, degree)
+            
+            w_1, _ = logistic_regression_model(targets_tr[0], data_tr[0], max_iters=15000, gamma=0.01)
+            w_2 = logistic_regression_demo_winit(targets_tr[2], data_tr[2], max_iters=10000, gamma=0.01)
+            w_3 = logistic_regression_demo_winit(targets_tr[3], data_tr[4], max_iters=10000, gamma=0.01)
+            weights = [w_1, w_2, w_3]
+            
+            pred_loss_tr = create_predictions_loss(weights, data_tr, ids_tr)
+            loss_tr = calculate_loss_lr_model(targets_tr[0], pred_loss_tr) 
+            
+            pred_loss_te = create_predictions_loss(weights, data_te, ids_te)
+            loss_te = calculate_loss_lr_model(targets_te[0], pred_loss_te)
+            
+            loss_tr_model[index_seed, index_degree] = loss_tr
+            loss_te_model[index_seed, index_degree] = loss_te
+
+    bias_variance_decomposition_visualization(degrees, loss_tr_model, loss_te_model)
+    
+    return degrees, loss_tr_model, loss_te_model
