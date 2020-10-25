@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Machine learning Project 1 : Prediction of Higgs Boson creation during LHC collisions
 
 ##### Course
