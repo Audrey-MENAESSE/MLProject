@@ -606,15 +606,15 @@ def create_predictions(weights, data, ids):
 
     # predict labels for jet=0
     y_pred0 = predict_labels01(weights0, tx_00)
-    y_pred0[y_pred0 < 0.6] = -1
+    y_pred0[y_pred0 == 0] = -1
 
     # predictions for jet=1
     y_pred1 = predict_labels01_comb(weights1, tx_1, weights0, tx_01)
-    y_pred1[y_pred1 < 0.6] = -1
+    y_pred1[y_pred1 == 0] = -1
 
     # predictions for jet=23
     y_pred2 = predict_labels01_comb(weights2, tx_2, weights0, tx_02)
-    y_pred2[y_pred2 < 0.6] = -1
+    y_pred2[y_pred2 == 0] = -1
     
     y_pred = np.vstack((y_pred0, y_pred1, y_pred2))
 
@@ -706,3 +706,86 @@ def calculate_loss_lr_model(y, pred):
     for i in range(y.shape[0]):
         loss = loss + np.log(1+np.exp(pred[i])) - y[i]*(pred[i])
     return loss/y.shape[0]
+
+# ********************************
+# Cross Validation
+# ********************************
+
+def cv_model(tX, headers, y, degree, tX_test, y_test, headers_test):
+    # process features for to train the model
+    data, targets, ids = process_features_train(tX, headers, y, degree)
+    
+    # train base model 
+    w_1 = logistic_regression_demo(targets[0], data[0], max_iters=10000, gamma=0.01)
+
+    # train jet=1 model using base model weights as initial weights
+    w_2 = logistic_regression_demo_winit(targets[2], data[2], w_1, max_iters=10000, gamma=0.01)
+
+    # train jet=2/3 model using base model weights as initial weights
+    w_3 = logistic_regression_demo_winit(targets[3], data[4], w_1, max_iters=10000, gamma=0.01)
+    
+    
+
+    # process test set
+    data, targets, ids = process_features_train(tX_test, headers, y_test, degree)
+
+    # create Predictions
+    weights = [w_1, w_2, w_3]
+    #y_pred_final = create_predictions(weights, data, ids)
+    
+    # calcualte the loss, but first calculate the predictions for the loss (0 1 type)
+    pred_loss = create_predictions_loss(weights, data, ids)
+    
+    loss = calculate_loss_lr_model(targets[0], pred_loss)
+    
+    # map the predictions into -1 and 1
+    y_pred_final = pred_loss.copy()
+    y_pred_final[np.where(y_pred_final <= 0.5)] = -1
+    y_pred_final[np.where(y_pred_final > 0.5)] = 1
+    
+    acc = np.sum(y_pred_final.T==y_test)/len(y_test)
+    
+    
+    return loss, acc
+
+def cross_validation(y, x, ids, degrees):
+    seed = 1
+    k_fold = 4
+    
+    
+    # split data in k fold
+    k_indices = build_k_indices(y, k_fold, seed)
+    # define lists to store the loss of training data and test data
+    loss = np.zeros((degrees, k_fold))
+    accuracy = np.zeros((degrees, k_fold))
+    
+    
+    for degree in np.arange(degrees)+1:
+        loss_d = []
+        acc_d = []
+        for k in range(k_fold):
+            #****************************************************
+            # Form train and test sets
+            x_tr = x[k_indices[np.arange(len(k_indices))!=k].ravel()]
+            x_te = x[k_indices[k]]
+
+            y_tr = y[k_indices[np.arange(len(k_indices))!=k].ravel()]
+            y_te = y[k_indices[k]]
+
+            ids_tr = ids[k_indices[np.arange(len(k_indices))!=k].ravel()]
+            ids_te = ids[k_indices[k]]
+
+            #****************************************************
+            # form data with polynomial degree
+            print("Fold number: {f}, polynomial degree: {d}".format(f=k+1, d=degree))
+
+            #****************************************************
+
+            lo, acc = cv_model(x_tr, headers, y_tr, degree, x_te, y_te, headers)
+            
+            loss_d.append(lo[0])
+            acc_d.append(acc)
+        loss[degree-1] = np.array(loss_d)
+        accuracy[degree-1] = np.array(acc_d)
+    
+    return loss, accuracy
