@@ -243,7 +243,7 @@ def logistic_regression_mod(y, tx, initial_w, max_iters, gamma):
     
     return w, loss
 
-def logistic_regression_demo(y, tx, max_iters, gamma):
+def logistic_regression_model(y, tx, max_iters, gamma):
     """polynomial regression with different split ratios and different degrees."""
     w_init = np.zeros((tx.shape[1], 1))
     
@@ -263,7 +263,7 @@ def logistic_regression_demo(y, tx, max_iters, gamma):
     
     return w_
 
-def logistic_regression_demo_winit(y, tx, w_init, max_iters, gamma):
+def logistic_regression_model_winit(y, tx, w_init, max_iters, gamma):
     """polynomial regression with different split ratios and different degrees.
        Here, we submit an initial weights vector obtained from previous sub-model"""
     # re-use weights from first model
@@ -838,7 +838,7 @@ def bias_variance_decomposition_visualization(degrees, rmse_tr, rmse_te):
 def bias_variance_baseline():
     """The entry."""
     # define parameters
-    seeds = range(2c0)
+    seeds = range(20)
     ratio_train = 0.8
     degrees = range(1, 10)
     gamma = 0.01
