@@ -53,7 +53,8 @@ def ridge_regression(y, tx, lambda_):
     a = (xx+ l1*np.eye(len(xx)))
     b = tx.T.dot(y)
     w = np.linalg.solve(a,b)
-    return w
+    loss = compute_loss_mse(y, tx, w)
+    return w, loss
 
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
@@ -244,7 +245,7 @@ def calculate_loss_lr(y, tx, w):
     loss = 0
     for i in range(y.shape[0]):
         loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w))
-    return loss
+    return loss/y.shape[0]
 
 
 def calculate_gradient_lr(y, tx, w):
@@ -264,8 +265,7 @@ def calculate_loss_lr_reg(y, tx, lambda_, w):
     loss = 0
     for i in range(y.shape[0]):
         loss = loss + np.log(1+np.exp(tx[i].dot(w))) - y[i]*(tx[i].dot(w)) + 0.5*lambda_*np.squeeze(w.T.dot(w))
-    loss = loss/y.shape[0]
-    return loss
+    return loss/y.shape[0]
 
 
 def calculate_gradient_lr_reg(y, tx, lambda_, w):
@@ -419,8 +419,6 @@ def process_features_train(tx, headers, y, deg):
     ids.append(inds1)
     ids.append(ids23)
     
-    
-    
     # create corresponding y vectors for each jet#
     y0 = y.copy()
     y1 = y.copy()
@@ -474,6 +472,7 @@ def logistic_regression_demo(y, tx, max_iters, gamma):
 def logistic_regression_demo_winit(y, tx, w_init, max_iters, gamma):
     """polynomial regression with different split ratios and different degrees."""
     # re-use weights from first model
+    w_init = w_init
     w_init[-4:] = 0
     w_init = np.resize(w_init, (tx.shape[1],1))
     
