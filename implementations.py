@@ -15,8 +15,8 @@ def least_squares_GD(y, tx, initial_w, max_iters, gamma):
         w = w - gamma*grad
         
         if n_iter % 100 == 0 or n_iter == max_iters-1:
-            loss = compute_loss_mse2(y, tx, w)
-            print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
+            loss = compute_loss_mse(y, tx, w)
+            #print("Current iteration={i}, training loss={l}".format(i=n_iter, l=loss))
 
     return w, loss
 
@@ -25,14 +25,14 @@ def least_squares_SGD(y, tx, initial_w, max_iters, gamma):
     """Stochastic gradient descent algorithm."""
     w = initial_w
     for n_iter in range(max_iters):
-        (y, tx) = np.random.choice(np.arange(len(y)))
+        i = np.random.choice(np.arange(len(y)))
         # loss is the MSE
-        grad = compute_gradient_ls(y, tx, w)
+        grad = compute_gradient_ls(y[i:i+1], tx[i:i+1], w)
         w = w - gamma*grad
         
         if n_iter % 100 == 0 or n_iter == max_iters-1:
             loss = compute_loss_mse(y, tx, w)
-            print("Gradient Descent({bi}/{ti}): loss={l}".format(bi=n_iter, ti=max_iters - 1, l=loss))
+            #print("Gradient Descent({bi}/{ti}): loss={l}".format(bi=n_iter, ti=max_iters - 1, l=loss))
         
     return w, loss
 
@@ -143,8 +143,8 @@ def calculate_loss_lr_reg_norm(y, tx, lambda_, w):
 
 def compute_gradient_ls(y, tx, w):
     """Compute the gradient for Least Squares."""
-
-    err = y[:, np.newaxis] - tx.dot(w);
+    y = y.reshape(y.shape[0], 1)
+    err = y - tx.dot(w);
     grad = -1/len(y) * tx.T.dot(err)
     
     return grad
